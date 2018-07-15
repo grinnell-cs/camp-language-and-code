@@ -117,12 +117,8 @@
   (let ([uri (url->string (request-uri request))]
         [bindings (request-bindings/raw request)])
     (newline)
-    (display "URI: ")
-    (write uri)
-    (newline)
-    (display "BINDINGS: ")
-    (write bindings)
-    (newline)
+    ; (display "URI: ") (write uri) (newline)
+    ; (display "BINDINGS: ") (write bindings) (newline)
     (let ([handler (hash-ref pages (substring uri 1) 'default)])
       (cond
         [(and (pair? handler) (eq? (car handler) 'proc))
