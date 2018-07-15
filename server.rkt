@@ -28,9 +28,31 @@
         (cons 'ul xexpr)
         (let ([path (car remaining)])
           (kernel (cdr remaining)
-                (cons `(li (a ((href ,path))
-                              ,path))
-                      xexpr))))))
+                  (cons `(li (a ((href ,path))
+                                ,path))
+                        xexpr))))))
+
+;;; Procedure:
+;;;   get
+;;; Parameters:
+;;;   key, a string
+;;;   stuff, bindings
+;;;   default, a string
+;;; Purpose:
+;;;   Get the value associated with key in stuff.
+;;;   (Read a form input.)
+;;; Produces:
+;;;   result, a string
+;;; Postconditions:
+;;;   If the user provided something for the key, gives you that thing.
+;;;   Otherwise, gives you default.
+(define (get key stuff default)
+  (let ([sym (if (string? key)
+                 (string->symbol key)
+                 key)])
+    (if (exists-binding? sym stuff)
+        (extract-binding/single sym stuff)
+        default)))
 
 ;;; Procedure:
 ;;;   serve-procedure
@@ -118,8 +140,8 @@
 ;;;   Contents, a byte string
 (define (read-file fname)
   (let* ([port (open-input-file (string-append (getenv "HOME")
-                                              "/"
-                                              fname))]
+                                               "/"
+                                               fname))]
          [result (port->bytes port)])
     (close-input-port port)
     result))
@@ -133,22 +155,24 @@
 ;;; Produces:
 ;;;   resp, an HTTP response (see https://docs.racket-lang.org/web-server/http.html)
 (define (serve request)
-  (let ([uri (url->string (request-uri request))]
-        [bindings (request-bindings/raw request)])
+  (let* ([uri (request-uri request)]
+         [path (path/param-path (car (url-path uri)))]
+         [bindings (request-bindings request)])
     (newline)
     ; (display "URI: ") (write uri) (newline)
+    ; (display "PATH: ") (write (path/param-path (car (url-path uri)))) (newline)
     ; (display "BINDINGS: ") (write bindings) (newline)
-    (let ([handler (hash-ref pages (substring uri 1) 'default)])
+    (let ([handler (hash-ref pages path 'default)])
       (cond
         [(and (pair? handler) (eq? (car handler) 'proc))
          (let ([proc (cadr handler)])
-           (display-line "Handling" uri "with procedure" proc)
+           (display-line "Handling" path "with procedure" proc)
            (response/xexpr
             (xexp->xexpr (proc bindings))))]
         [(and (pair? handler) (eq? (car handler) 'string))
          (let ([contents (cadr handler)]
                [type (caddr handler)])
-           (display-line "Handling" uri "with a string")
+           (display-line "Handling" path "with a string")
            (response 200 #"OK"
                      (current-seconds)
                      (string->bytes/utf-8 (string-append "text/" type))
@@ -158,19 +182,19 @@
          (let* ([filename (cadr handler)]
                 [bytes (read-file filename)]
                 [type (cond
-                       [(regexp-match #rx"\\.html$" filename)
-                        "html"]
-                       [(regexp-match #rx"\\.css$" filename)
-                        "css"]
-                       [else
-                        "plain"])])
-           (display-line "Handling" uri "with file" filename)
+                        [(regexp-match #rx"\\.html$" filename)
+                         "html"]
+                        [(regexp-match #rx"\\.css$" filename)
+                         "css"]
+                        [else
+                         "plain"])])
+           (display-line "Handling" path "with file" filename)
            (response 200 #"OK"
                      (current-seconds)
                      (string->bytes/utf-8 (string-append "text/" type))
                      empty
                      (lambda (port) (write-bytes bytes port))))]
-        [(equal? uri "/")
+        [(equal? path "")
          (display-line "Serving the default home page")
          (response/xexpr
           `(html (head (title "L&C Web Server"))
@@ -178,12 +202,11 @@
                   (h1 "L&C Web Server - List of Available Pages")
                   ,(pages->xexpr))))]
         [else
-         (display-line "Could not find handler for" uri)
+         (display-line "Could not find handler for \"" path "\"")
          (response/xexpr
           `(html (head (title "Page not found"))
                  (body
-                  (p "Could not find the page "
-                     ,uri))))]))))
+                  (p "Could not find the page '" ,path "'"))))]))))
 
 ;;; Procedure:
 ;;;   start-server
@@ -205,6 +228,8 @@
 ;;;   Conduct a simple experiment
 ;;; Produces:
 ;;;   [Nothing, I think]
+;;; Problems:
+;;;   Arguably, this should be in a separate file.  But I'm keeping it here during development.
 (define (experiment)
   (let ([first-page (lambda (bindings)
                       (html->xexp
@@ -220,19 +245,19 @@
                                 (p 17)
                                 (p hello)
                                 (p "Test")))))])
-
+    
     (serve-procedure "first" first-page)
     (serve-procedure "second" second-page)
     
     (serve-string "html"
-                      "<html><head><title>HTML</title><body><p class='one'>This is HTML</body></html>"
-                      "html")
+                  "<html><head><title>HTML</title><body><p class='one'>This is HTML</body></html>"
+                  "html")
     (serve-string "text"
-                     "<html><head><title>HTML</title><body><p class='one'>This is HTML</body></html>"
-                     "plain")
+                  "<html><head><title>HTML</title><body><p class='one'>This is HTML</body></html>"
+                  "plain")
     (serve-string "styles.css"
-                      "body { background-color: red; }"
-                      "css")
+                  "body { background-color: red; }"
+                  "css")
     (serve-file "file/one" "Desktop/LanguageAndCode/file.txt")
     (serve-file "file/two" "Desktop/LanguageAndCode/file.html")
     (serve-file "file/three" "Desktop/LanguageAndCode/html.txt")
