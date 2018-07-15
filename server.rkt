@@ -52,9 +52,11 @@
 ;;;   xexpr, a corresponding xexpr
 (define (xexp->xexpr xexp)
   (cond
-    ; A little hack to help my students
+    ; Two little hacks to help my students
     [(number? xexp)
      (number->string xexp)]
+    [(symbol? xexp)
+     (symbol->string xexp)]
     ; Non-pairs should stay as is
     [(not (pair? xexp))
      xexp]
@@ -194,6 +196,7 @@
                           (body (@ (class "Sam"))
                                 (p "Generated with an xexp")
                                 (p 17)
+                                (p hello)
                                 (p "Test")))))])
 
     (serve-procedure "first" first-page)
