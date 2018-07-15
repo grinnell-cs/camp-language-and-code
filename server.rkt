@@ -14,6 +14,25 @@
 (define pages (make-hash))
 
 ;;; Procedure:
+;;;   pages->xexpr
+;;; Parameters:
+;;;   [None]
+;;; Purpose:
+;;;   Makes an xexpr for all the pages we have.
+;;; Produces:
+;;;   xexpr, an xexpr that represents all the pages.
+(define (pages->xexpr)
+  (let kernel ([remaining (sort (hash-keys pages) string-ci>=?)]
+               [xexpr null])
+    (if (null? remaining)
+        (cons 'ul xexpr)
+        (let ([path (car remaining)])
+          (kernel (cdr remaining)
+                (cons `(li (a ((href ,path))
+                              ,path))
+                      xexpr))))))
+
+;;; Procedure:
 ;;;   serve-procedure
 ;;; Parameters:
 ;;;   path, a string
@@ -151,6 +170,13 @@
                      (string->bytes/utf-8 (string-append "text/" type))
                      empty
                      (lambda (port) (write-bytes bytes port))))]
+        [(equal? uri "/")
+         (display-line "Serving the default home page")
+         (response/xexpr
+          `(html (head (title "L&C Web Server"))
+                 (body
+                  (h1 "L&C Web Server - List of Available Pages")
+                  ,(pages->xexpr))))]
         [else
          (display-line "Could not find handler for" uri)
          (response/xexpr
