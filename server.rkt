@@ -233,7 +233,7 @@
     (serve-string "styles.css"
                       "body { background-color: red; }"
                       "css")
-    (serve-file "file1" "Desktop/LanguageAndCode/file.txt")
-    (serve-file "file2" "Desktop/LanguageAndCode/file.html")
-    (serve-file "file3" "Desktop/LanguageAndCode/html.txt")
+    (serve-file "file/one" "Desktop/LanguageAndCode/file.txt")
+    (serve-file "file/two" "Desktop/LanguageAndCode/file.html")
+    (serve-file "file/three" "Desktop/LanguageAndCode/html.txt")
     (start-server)))
