@@ -1,4 +1,4 @@
 #lang info
 
-(define collection "camp-language-and-code")
+(define collection "lac-camp")
 
