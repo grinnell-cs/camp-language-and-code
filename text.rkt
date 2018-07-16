@@ -56,7 +56,18 @@
 ;;; Produce:
 ;;;   capitalized, a string
 (define (capitalize str)
-  (if (char-upper-case? (string-ref str 0))
+  (if (starts-with-capital? str)
       str
       (string-append (string-upcase (substring str 0 1))
                      (substring str 1))))
+
+;;; Procedure:
+;;;   starts-with-capital?
+;;; Parameters:
+;;;   str, a string
+;;; Purpose:
+;;;   Determine if str starts with a capital letter.
+;;; Produces:
+;;;   swc?, a Boolean
+(define (starts-with-capital? str)
+   (char-upper-case? (string-ref str 0)))
