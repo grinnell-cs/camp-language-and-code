@@ -1,5 +1,5 @@
 #lang racket
-(provide (all-defined out))
+(provide (all-defined-out))
 
 ;;; Macro:
 ;;;   one-of
@@ -27,3 +27,36 @@
              ; (write code) (newline)
              (datum->syntax stx code)))]))))
 
+;;; Procedure:
+;;;   add-indefinite-article
+;;; Parameters:
+;;;   str, a string
+;;; Purpose:
+;;;   Add the appropriate article to the front of the string.
+;;; Produces:
+;;;   newstr, a string
+(define (add-indefinite-article str)
+  (let ([first (substring str 0 1)])
+    (cond
+      [(string-contains? "aeiou" first)
+       (string-append "an " str)]
+      [(string-contains? "AEIOU" first)
+       (string-append "An " (string-downcase first) (substring str 1))]
+      [(char-upper-case? (string-ref str 0))
+       (string-append "A " (string-downcase first) (substring str 1))]
+      [else
+       (string-append "a " str)])))
+
+;;; Procedure:
+;;;   capitalize
+;;; Parameters:
+;;;   str, a string
+;;; Purpose:
+;;;   capitalize the first letter of str.
+;;; Produce:
+;;;   capitalized, a string
+(define (capitalize str)
+  (if (char-upper-case? (string-ref str 0))
+      str
+      (string-append (string-upcase (substring str 0 1))
+                     (substring str 1))))
