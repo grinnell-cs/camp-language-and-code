@@ -49,21 +49,22 @@
 ;;; Purpose:
 ;;;   Extract the given attribute from the expression.
 (define (extract-attribute attribute xexp)
-  (cond
-    [(not (pair? xexp))
-     null]
-    [(null? (cdr xexp))
-     null]
-    [(not (pair? (cadr xexp)))
-     null]
-    [(not (eq? '@ (caadr xexp)))
-     null]
-    [else
-     (let kernel ([attributes (cdadr xexp)])
-       (cond 
-         [(null? attributes)
-	  null]
-	 [(eq? attribute (caar attributes))
-	  (cadar attributes)]
-	 [else
-	  (kernel (cdr attributes))]))]))
+  (let ([default ""])
+    (cond
+      [(not (pair? xexp))
+       default]
+      [(null? (cdr xexp))
+       default]
+      [(not (pair? (cadr xexp)))
+       default]
+      [(not (eq? '@ (caadr xexp)))
+       default]
+      [else
+       (let kernel ([attributes (cdadr xexp)])
+         (cond 
+           [(null? attributes)
+            default]
+           [(eq? attribute (caar attributes))
+            (cadar attributes)]
+           [else
+            (kernel (cdr attributes))]))])))
