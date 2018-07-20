@@ -10,8 +10,14 @@
 (provide
  (contract-out
   [file->chars (-> string? (listof char?))]
+  [file->chunks (-> string? (listof string?))]
   [file->lines (-> string? (listof string?))]
+  [file->sentences (-> string? (listof string?))]
+  [file->tweets (-> string? (listof (listof string?)))]
   [file->words (-> string? (listof string?))]
+  [read-chunk (-> input-port? string?)]
+  [read-sentence (-> input-port? string?)]
+  [read-tweet (-> input-port? (listof string?))]
   [read-word (-> input-port? string?)]
   [skip-char (-> input-port? char? boolean?)]
   [read-until (-> input-port? (or/c procedure? char? string?) string?)]))
@@ -21,7 +27,7 @@
 ; +---------------------+
 
 ;;; Package:
-;;;   csc151/files
+;;;   lac-camp/files
 ;;; Procedure:
 ;;;   file->chars
 ;;; Parameters:
@@ -39,7 +45,7 @@
     (file->stuff fname read-char eof-object?)))
 
 ;;; Package:
-;;;   csc151/files
+;;;   lac-camp/files
 ;;; Procedure:
 ;;;   file->lines
 ;;; Parameters:
@@ -53,12 +59,70 @@
 ;;; Postconditions:
 ;;;   lines contains all of the lines in the file, in the order they appear,
 ;;;   but without newlines.
-(define file->line
+(define file->lines
   (lambda (fname)
     (file->stuff fname read-line eof-object?)))
 
 ;;; Package:
-;;;   csc151/files
+;;;   lac-camp/files
+;;; Procedure:
+;;;   file->sentences
+;;; Parameters:
+;;;   fname, a string
+;;; Purpose:
+;;;   Reads and returns all of the sentences in the file
+;;; Produces:
+;;;   sentences, a list of strings
+;;; Preconditions:
+;;;   fname names a valid file
+;;; Postconditions:
+;;;   lines contains all of the sentences in the file, in the order they
+;;;   appear.
+(define file->sentences
+  (lambda (fname)
+    (file->stuff fname read-sentence (lambda (stuff) (equal? stuff "")))))
+
+;;; Package:
+;;;   lac-camp/files
+;;; Procedure:
+;;;   file->chunks
+;;; Parameters:
+;;;   fname, a string
+;;; Purpose:
+;;;   Reads and returns all of the "chunks" (things separated by spaces)
+;;;   in the file.
+;;; Produces:
+;;;   words, a list of strings
+;;; Preconditions:
+;;;   fname names a valid file
+;;; Postconditions:
+;;;   words contains all of the words in the file, in the order they appear,
+;;;   but without punctuation.
+(define file->chunks
+  (lambda (fname)
+    (file->stuff fname read-chunk (lambda (stuff) (equal? stuff "")))))
+
+;;; Package:
+;;;   lac-camp/files
+;;; Procedure:
+;;;   file->tweets
+;;; Parameters:
+;;;   fname, a string
+;;; Purpose:
+;;;   Reads and returns all of the lines in the file
+;;; Produces:
+;;;   lines, a list of strings
+;;; Preconditions:
+;;;   fname names a valid file
+;;; Postconditions:
+;;;   lines contains all of the lines in the file, in the order they appear,
+;;;   but without newlines.
+(define file->tweets
+  (lambda (fname)
+    (file->stuff fname read-tweet eof-object?)))
+
+;;; Package:
+;;;   lac-camp/files
 ;;; Procedure:
 ;;;   file->words
 ;;; Parameters:
@@ -77,7 +141,127 @@
     (file->stuff fname read-word (lambda (stuff) (equal? stuff "")))))
 
 ;;; Package:
-;;;   csc151/files
+;;;   lac-camp/files
+;;; Procedure:
+;;;   read-charseq
+;;; Parameters:
+;;;   port, an input port
+;;;   pred?, a character predicate
+;;; Purpose:
+;;;   Read a sequence of characters that meet pred and return
+;;;   them as a string.
+;;; Produces:
+;;;   str, a string
+;;; Preconditions:
+;;;   port is open for reading.
+;;; Postconditions:
+;;;   * str represents the next sequence of characters for which
+;;;     pred? holds.
+;;;   * If there is no such sequence, str is ""
+;;; Philosophy:
+;;;   DRY out read-word, read-chunk, and read-sentence.
+(define read-charseq
+  (lambda (port pred?)
+    (let kernel ([chars null])
+      (let ([ch (peek-char port)])
+        (cond
+          [(eof-object? ch)
+           (list->string (reverse chars))]
+          [(pred? ch)
+           (read-char port)
+           (kernel (cons ch chars))]
+          [(null? chars)
+           (read-char port)
+           (kernel null)]
+          [else
+           (list->string (reverse chars))])))))
+
+;;; Package:
+;;;   lac-camp/files
+;;; Procedure:
+;;;   read-chunk
+;;; Parameters:
+;;;   port, an input port
+;;; Purpose:
+;;;   Reads the next chunk from the port
+;;; Produces:
+;;;   chunk, a string
+;;; Preconditions:
+;;;   port is open for reading
+;;; Postconditions:
+;;;   word is the next word in the port.
+(define read-chunk
+  (lambda (port)
+    (read-charseq port (lambda (ch) (not (char-whitespace? ch))))))
+
+;;; Package:
+;;;   lac-camp/files
+;;; Procedure:
+;;;   read-sentence
+;;; Parameters:
+;;;   port, an input port
+;;; Purpose:
+;;;   Reads the next sentence from the port
+;;; Produces:
+;;;   sentence , a string
+;;; Preconditions:
+;;;   port is open for reading
+;;; Postconditions:
+;;;   word is the next sentence (or reasonable variant thereof) in 
+;;;   the port.
+;;; Problems:
+;;;   Our view of "sentence" is fairly simplistic.  It's something
+;;;   that ends with a period, question mark, or exclamation point.
+(define read-sentence
+  (let ([punctuation (vector #\. #\? #\!)])
+    (lambda (port)
+      (let* ([all-but-punctuation
+             (read-charseq port
+                           (lambda (ch)
+                             (not (vector-member ch punctuation))))]
+             [punctuation (read-char port)]
+             [sentence  (if (char? punctuation)
+                             (string-append all-but-punctuation
+                                            (string punctuation))
+                             all-but-punctuation)])
+        (regexp-replace #rx"^ *"
+                        (regexp-replace* #rx"\n" sentence " ")
+                        "")))))
+
+;;; Package:
+;;;   lac-camp/files
+;;; Procedure:
+;;;   read-tweet
+;;; Parameters:
+;;;   port, an input port
+;;; Purpose:
+;;;   Reads the next tweet from the port
+;;; Produces:
+;;;   tweet, a string
+;;; Preconditions:
+;;;   * port is open for reading
+;;;   * port contains tweets in standard form
+;;; Postconditions:
+;;;   * tweet is the next tweet in the port.
+;;;   * If there is no next tweet, tweet is the eof object
+(define read-tweet
+  (lambda (port)
+    (let kernel ([tweet null])
+      (let [(line (read-line port))]
+        (if (eof-object? line)
+            (if (not (null? tweet))
+                (cons "TWEET" (reverse tweet))
+                line)
+            (let ([datum (regexp-replace #rx"[\r\n ]*$" line "")])
+              (if (or (string=? datum "")
+                      (regexp-match #rx"^-*$" datum))
+                  (if (null? tweet)
+                      (kernel tweet)
+                      (cons "TWEET" (reverse tweet)))
+                  (kernel (cons datum tweet)))))))))
+
+;;; Package:
+;;;   lac-camp/files
 ;;; Procedure:
 ;;;   read-word
 ;;; Parameters:
@@ -92,20 +276,10 @@
 ;;;   word is the next word in the port.
 (define read-word
   (lambda (port)
-    (let kernel ([chars null])
-      (let ([ch (read-char port)])
-        (cond
-          [(eof-object? ch)
-           (list->string (reverse chars))]
-          [(word-char? ch)
-           (kernel (cons ch chars))]
-          [(null? chars)
-           (kernel null)]
-          [else
-           (list->string (reverse chars))])))))
+    (read-charseq port word-char?)))
 
 ;;; Package:
-;;;   csc151/files
+;;;   lac-camp/files
 ;;; Procedure:
 ;;;   read-until
 ;;; Parameters:
@@ -146,7 +320,7 @@
               (kernel (cons (read-char port) chars))))))))
 
 ;;; Package:
-;;;   csc151/files
+;;;   lac-camp/files
 ;;; Procedure:
 ;;;   skip-char
 ;;; Parameters:
