@@ -9,7 +9,9 @@
 
 (require html-parsing)
 (require net/url)
-(require sxml/sxpath)
+(require sxml)
+(require "text.rkt")
+(require "lists.rkt")
 
 (provide (all-defined-out))
 
@@ -240,3 +242,98 @@
 ; +-----------------+------------------------------------------------
 ; | Transform pages |
 ; +-----------------+
+
+;;; Procedure:
+;;;   page-transform-elements
+;;; Parameters:
+;;;   page, a page in the standard xexp format
+;;;   tag, a symbol
+;;;   transform, a procedure from elements to elements
+;;; Purpose:
+;;;   Transform all of the elements that start with the given tag
+;;; Produces:
+;;;   transformed, a page in the standard xexp format
+(define (page-transform-elements page tag transform)
+  ((sxml:modify (list (string-append "//"
+                                     (symbol->string tag))
+                      ; sxml:modify expects a three parameter proc;
+                      ; we expect a one-parameter proc.
+                      (lambda (element context root)
+                        (transform element))))
+   page))
+
+;;; Procedure:
+;;;   page-delete-elements
+;;; Parameters:
+;;;   page, a page in the standard xexp format
+;;;   tag, a symbol
+;;; Purpose:
+;;;   Delete all of the elements with the given tag
+;;; Produces:
+;;;   newpage, a page in the standard xexp format
+(define (page-delete-elements page tag)
+  ((sxml:modify (list (string-append "//"
+                                     (symbol->string tag))
+                      'delete))
+   page))
+
+;;; Procedure:
+;;;   page-replace-text
+;;; Parameters:
+;;;   page, a page in the standard xexp format
+;;;   pattern, a string or a regular expression
+;;;   replacement, a string (for now)
+;;; Purpose:
+;;;   Replace all instances of pattern in the text by replacement
+;;; Produces:
+;;;   newpage, a page in the standard xexp format
+;;; Problem:
+;;;   Does not yet handle the situation in which replacement is a
+;;;   replacement element.
+(define (page-replace-text page pattern replacement)
+  (if (pair? replacement)
+      (page-replace-text page pattern
+                         (lambda (element) replacement))
+      (let* ([rxpattern (if (regexp? pattern)
+                            pattern
+                            (regexp pattern))]
+             [proc (cond
+                     [(string? replacement)
+                      (lambda (element context root)
+                        (regexp-replace* rxpattern element replacement))]
+                     [(symbol? replacement)
+                      (let ([str (symbol->string replacement)])
+                        (lambda (element context root)
+                          (regexp-replace* rxpattern element str)))]
+                     [(procedure? replacement)
+                      (lambda (element context root)
+                        (let kernel ([pieces (regexp-pieces rxpattern element)]
+                                     [results null])
+                          (cond
+                            [(null? pieces)
+                             (if (all string? results)
+                                 (reduce string-append (reverse results))
+                                 (cons 'span (reverse results)))]
+                            [(regexp-match rxpattern (car pieces))
+                             (kernel (cdr pieces)
+                                     (cons (replacement (car pieces)) results))]
+                            [else
+                             (kernel (cdr pieces)
+                                     (cons (car pieces) results))])))]
+                 [else
+                  (error "Invalid replacement" replacement)])])
+        ((sxml:modify (list "//text()" proc))
+         page))))
+
+;;; Procedure:
+;;;   page-add-to-end
+;;; Parameters:
+;;;   page, a page
+;;;   element, an xexp
+;;; Purpose:
+;;;   Add element to the end of the body of page
+(define (page-add-to-end page element)
+  ((sxml:modify (list "//body"
+                      'insert-into
+                      element))
+   page))
