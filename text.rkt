@@ -70,6 +70,34 @@
                      (substring str 1))))
 
 ;;; Procedure:
+;;;   regexp-pieces
+;;; Parameters:
+;;;   re, a regexp
+;;; Purpose:
+;;;   Split the string at every copy of re, generating a list of strings.
+;;; Produces:
+;;;   pices, a list of strings
+(define (regexp-pieces regexp str)
+  (let ([add-substring
+         (lambda (start finish lst)
+           (if (< start finish)
+               (cons (substring str start finish) lst)
+               lst))]
+        [len (string-length str)])
+    (let kernel ([cur 0]
+                 [positions (regexp-match-positions* regexp str)]
+                 [substrings null])
+      (if (null? positions)
+          (reverse (add-substring cur len substrings))
+          (let* ([front (caar positions)]
+                 [back (cdar positions)])
+            (kernel back
+                    (cdr positions)
+                    (add-substring front back
+                                   (add-substring cur front
+                                                  substrings))))))))
+
+;;; Procedure:
 ;;;   starts-with-capital?
 ;;; Parameters:
 ;;;   str, a string
