@@ -1,4 +1,12 @@
 #lang racket
+
+;;; File:
+;;;   text.rkt
+;;; Summary:
+;;;   A variety of procedures for working with text.
+;;; Author:
+;;;   Samuel A. Rebelsky
+
 (provide (all-defined-out))
 
 ;;; Macro:
@@ -70,4 +78,19 @@
 ;;; Produces:
 ;;;   swc?, a Boolean
 (define (starts-with-capital? str)
-   (char-upper-case? (string-ref str 0)))
+  (and (string? str)
+       (> (string-length str) 0)
+       (char-upper-case? (string-ref str 0))))
+
+;;; Procedure:
+;;;   starts-with-vowel?
+;;; Parameters:
+;;;   str, a string
+;;; Purpose:
+;;;   Determines if str starts with a vowel (at least in English)
+;;; Produces:
+;;;   swv?, a Boolean
+(define (starts-with-vowel? str)
+  (and (string? str)
+       (> (string-length str) 0)
+       (string-contains? "aeiouAEIOU" (substring str 0 1))))
