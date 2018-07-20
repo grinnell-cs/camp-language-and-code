@@ -1,9 +1,24 @@
 #lang racket
+
+;;; File:
+;;;   server.rkt
+;;; Summary:
+;;;   A really simple Web server for the code camp.
+;;; Author:
+;;;   Samuel A. Rebelsky
+
 (provide (all-defined-out))
+(require "web-utils.rkt")
+(require "lists.rkt")
 (require html-parsing)
+(require html-writing)
 (require web-server/servlet
          web-server/servlet-env)
 (require web-server/http/bindings)
+
+; +---------+--------------------------------------------------------
+; | Globals |
+; +---------+
 
 ;;; Value:
 ;;;   pages
@@ -13,24 +28,9 @@
 ;;;   A list of all page->thing mappings.
 (define pages (make-hash))
 
-;;; Procedure:
-;;;   pages->xexpr
-;;; Parameters:
-;;;   [None]
-;;; Purpose:
-;;;   Makes an xexpr for all the pages we have.
-;;; Produces:
-;;;   xexpr, an xexpr that represents all the pages.
-(define (pages->xexpr)
-  (let kernel ([remaining (sort (hash-keys pages) string-ci>=?)]
-               [xexpr null])
-    (if (null? remaining)
-        (cons 'ul xexpr)
-        (let ([path (car remaining)])
-          (kernel (cdr remaining)
-                  (cons `(li (a ((href ,path))
-                                ,path))
-                        xexpr))))))
+; +---------------------------+--------------------------------------
+; | Primary client procedures |
+; +---------------------------+
 
 ;;; Procedure:
 ;;;   get
@@ -64,6 +64,8 @@
 ;;; Produces:
 ;;;   [Nothing; called for the side effect]
 (define (serve-procedure path proc)
+  (hash-set! pages path (list 'procedure proc)))
+(define (serve-proc path proc)
   (hash-set! pages path (list 'proc proc)))
 
 ;;; Procedure:
@@ -80,36 +82,53 @@
 (define (serve-string path str type)
   (hash-set! pages path (list 'string str type)))
 
+;;; Procedure:
+;;;   serve-file
+;;; Parameters:
+;;;   path, a string
+;;;   filepath, a string
+;;; Purpose:
+;;;   Indicate that we should handle path by returning the contents
+;;;   of the given file.
+;;; Produces:
+;;;   [Nothing; called for the side effect]
 (define (serve-file path file)
   (hash-set! pages path (list 'file file)))
 
 ;;; Procedure:
-;;;   xexp->xexpr
+;;;   start-server
 ;;; Parameters:
-;;;   xexp, an xexp
+;;;   [None]
 ;;; Purpose:
-;;;   Convert xexp to an xexpr
+;;;   Start the server and open a Web page
+(define (start-server)
+  (serve/servlet serve
+                 #:listen-ip #f
+                 #:servlet-regexp #rx""
+                 #:servlet-path "/"))
+
+; +-----------+------------------------------------------------------
+; | Utilities |
+; +-----------+
+
+;;; Procedure:
+;;;   pages->xexpr
+;;; Parameters:
+;;;   [None]
+;;; Purpose:
+;;;   Makes an xexpr for all the pages we have.
 ;;; Produces:
-;;;   xexpr, a corresponding xexpr
-(define (xexp->xexpr xexp)
-  (cond
-    ; Two little hacks to help my students
-    [(number? xexp)
-     (number->string xexp)]
-    [(symbol? xexp)
-     (symbol->string xexp)]
-    ; Non-pairs should stay as is
-    [(not (pair? xexp))
-     xexp]
-    ; If we start with *TOP*, the stuff we care about is at the end.
-    [(eq? (car xexp) '*TOP*)
-     (xexp->xexpr (last xexp))]
-    ; Drop the @ for parameters
-    [(eq? (car xexp) '@)
-     (cdr xexp)]
-    [else
-     (cons (car xexp)
-           (map xexp->xexpr (cdr xexp)))]))
+;;;   xexpr, an xexpr that represents a list of all the pages.
+(define (pages->xexpr)
+  (let kernel ([remaining (sort (hash-keys pages) string-ci>=?)]
+               [xexpr null])
+    (if (null? remaining)
+        (cons 'ul xexpr)
+        (let ([path (car remaining)])
+          (kernel (cdr remaining)
+                  (cons `(li (a ((href ,path))
+                                ,path))
+                        xexpr))))))
 
 ;;; Procedure:
 ;;;   display-line
@@ -124,10 +143,7 @@
 ;;;   [Nothing; called for the side effect.]
 (define display-line
   (lambda vals
-    (for-each (lambda (val)
-                (display val)
-                (display " "))
-              vals)
+    (for-each display vals)
     (newline)))
 
 ;;; Procedure:
@@ -147,6 +163,18 @@
     result))
 
 ;;; Procedure:
+;;;   request-path
+;;; Parameters
+;;;   req, an HTTP request
+;;; Purpose:
+;;;   Find the path from a request
+;;; Produces:
+;;;   path, a string
+(define (request-path req)
+  (let ([components (map path/param-path (url-path (request-uri req)))])
+    (reduce (lambda (a b) (string-append a "/" b)) components)))
+
+;;; Procedure:
 ;;;   serve
 ;;; Parameters:
 ;;;   req, an HTTP request (see https://docs.racket-lang.org/web-server/http.html)
@@ -156,28 +184,41 @@
 ;;;   resp, an HTTP response (see https://docs.racket-lang.org/web-server/http.html)
 (define (serve request)
   (let* ([uri (request-uri request)]
-         [path (path/param-path (car (url-path uri)))]
+         [path (request-path request)]
          [bindings (request-bindings request)])
     (newline)
     ; (display "URI: ") (write uri) (newline)
-    ; (display "PATH: ") (write (path/param-path (car (url-path uri)))) (newline)
+    ; (display "URL-PATH: ") (write (url-path uri)) (newline)
+    ; (display "PATH: ") (write path) (newline)
     ; (display "BINDINGS: ") (write bindings) (newline)
     (let ([handler (hash-ref pages path 'default)])
       (cond
+        ; Normal procedure handler
+        [(and (pair? handler) (eq? (car handler) 'procedure))
+         (let ([proc (cadr handler)])
+           (display-line "Handling '" path "' with alternative procedure" proc)
+           (response 200 #"OK"
+                     (current-seconds)
+                     TEXT/HTML-MIME-TYPE
+                     empty
+                     (lambda (port) (write-html (proc bindings) port))))]
+        ; Alternate procedure handler
         [(and (pair? handler) (eq? (car handler) 'proc))
          (let ([proc (cadr handler)])
-           (display-line "Handling" path "with procedure" proc)
+           (display-line "Handling '" path "' with procedure" proc)
            (response/xexpr
             (xexp->xexpr (proc bindings))))]
+        ; String handler
         [(and (pair? handler) (eq? (car handler) 'string))
          (let ([contents (cadr handler)]
                [type (caddr handler)])
-           (display-line "Handling" path "with a string")
+           (display-line "Handling '" path "' with a string")
            (response 200 #"OK"
                      (current-seconds)
                      (string->bytes/utf-8 (string-append "text/" type))
                      empty
                      (lambda (port) (display contents port))))]
+        ; File handler
         [(and (pair? handler) (eq? (car handler) 'file))
          (let* ([filename (cadr handler)]
                 [bytes (read-file filename)]
@@ -194,6 +235,7 @@
                      (string->bytes/utf-8 (string-append "text/" type))
                      empty
                      (lambda (port) (write-bytes bytes port))))]
+        ; Default home page
         [(equal? path "")
          (display-line "Serving the default home page")
          (response/xexpr
@@ -201,6 +243,7 @@
                  (body
                   (h1 "L&C Web Server - List of Available Pages")
                   ,(pages->xexpr))))]
+        ; Missing pages
         [else
          (display-line "Could not find handler for \"" path "\"")
          (response/xexpr
@@ -208,17 +251,9 @@
                  (body
                   (p "Could not find the page '" ,path "'"))))]))))
 
-;;; Procedure:
-;;;   start-server
-;;; Parameters:
-;;;   [None]
-;;; Purpose:
-;;;   Start the server and open a Web page
-(define (start-server)
-  (serve/servlet serve
-                 #:listen-ip #f
-                 #:servlet-regexp #rx""
-                 #:servlet-path "/"))
+; +-----------------------+------------------------------------------
+; | Tests and experiments |
+; +-----------------------+
 
 ;;; Procedure:
 ;;;   experiment
