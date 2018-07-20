@@ -9,11 +9,33 @@
 
 (provide
   (contract-out
-    [reduce (-> (-> any/c any/c any) list? any/c)]
-    [tally-all (-> list? list?)]
-    [sort-by-count-decreasing (-> list? list?)]
-    [sort-by-count-increasing (-> list? list?)]
-    ))
+   [all (-> procedure? list? boolean?)]
+   [reduce (-> (-> any/c any/c any) list? any/c)]
+   [tally-all (-> list? list?)]
+   [sort-by-count-decreasing (-> list? list?)]
+   [sort-by-count-increasing (-> list? list?)]
+   ))
+
+;;; Procedure:
+;;;   all
+;;; Parameters:
+;;;   pred?, a unary predicate
+;;;   lst, a list
+;;; Purpose:
+;;;   Determine if pred? holds for all the values in lst.
+;;; Produces:
+;;;   ok?, a Boolean
+;;; Preconditions:
+;;;   [Standard]
+;;; Postconditions:
+;;;   If there is an i such that (pred? (list-ref lst i))
+;;;     fails to hold, then ok? is false.
+;;;   Otherwise, ok? is true.
+(define all
+  (lambda (pred? lst)
+    (or (null? lst)
+        (and (pred? (car lst))
+             (all pred? (cdr lst))))))
 
 ;;; Procedure:
 ;;;   tally-all
