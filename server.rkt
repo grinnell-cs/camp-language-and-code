@@ -196,18 +196,18 @@
         ; Normal procedure handler
         [(and (pair? handler) (eq? (car handler) 'procedure))
          (let ([proc (cadr handler)])
-           (display-line "Handling '" path "' with alternative procedure" proc)
+           (display-line "Handling '" path "' with procedure" proc)
            (response 200 #"OK"
                      (current-seconds)
                      TEXT/HTML-MIME-TYPE
                      empty
-                     (lambda (port) (write-html (proc bindings) port))))]
+                     (lambda (port) (write-html (xexp/cleanup (proc bindings)) port))))]
         ; Alternate procedure handler
         [(and (pair? handler) (eq? (car handler) 'proc))
          (let ([proc (cadr handler)])
-           (display-line "Handling '" path "' with procedure" proc)
+           (display-line "Handling '" path "' with alternate procedure" proc)
            (response/xexpr
-            (xexp->xexpr (proc bindings))))]
+            (xexp->xexpr (xexp/cleanup (proc bindings)))))]
         ; String handler
         [(and (pair? handler) (eq? (car handler) 'string))
          (let ([contents (cadr handler)]
