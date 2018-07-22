@@ -36,7 +36,7 @@
 ;;;   get
 ;;; Parameters:
 ;;;   key, a string
-;;;   stuff, bindings
+;;;   request, a request
 ;;;   default, a string
 ;;; Purpose:
 ;;;   Get the value associated with key in stuff.
@@ -46,12 +46,13 @@
 ;;; Postconditions:
 ;;;   If the user provided something for the key, gives you that thing.
 ;;;   Otherwise, gives you default.
-(define (get key stuff default)
+(define (get key request default)
   (let ([sym (if (string? key)
                  (string->symbol key)
-                 key)])
-    (if (exists-binding? sym stuff)
-        (extract-binding/single sym stuff)
+                 key)]
+        [bindings (request-bindings request)])
+    (if (exists-binding? sym bindings)
+        (extract-binding/single sym bindings)
         default)))
 
 ;;; Procedure:
@@ -201,13 +202,13 @@
                      (current-seconds)
                      TEXT/HTML-MIME-TYPE
                      empty
-                     (lambda (port) (write-html (xexp/cleanup (proc bindings)) port))))]
+                     (lambda (port) (write-html (xexp/cleanup (proc request)) port))))]
         ; Alternate procedure handler
         [(and (pair? handler) (eq? (car handler) 'proc))
          (let ([proc (cadr handler)])
            (display-line "Handling '" path "' with alternate procedure" proc)
            (response/xexpr
-            (xexp->xexpr (xexp/cleanup (proc bindings)))))]
+            (xexp->xexpr (xexp/cleanup (proc request)))))]
         ; String handler
         [(and (pair? handler) (eq? (car handler) 'string))
          (let ([contents (cadr handler)]
