@@ -156,7 +156,13 @@
 ;;; Produces:
 ;;;   page, an xexp expression
 (define (fetch-page-pure url)
-  (xexp/top-element (fetch-page-top url)))
+  (if (regexp-match #rx"^http" url)
+      (xexp/top-element (fetch-page-top url))
+      `(html
+         (head (title "Invalid URL"))
+         (body
+          (h1 "Invalid URL")
+          (p "Could not process the URL '" ,url "'")))))
 
 (define (fetch-page-top url)
   (html->xexp (get-pure-port (string->url url))))
