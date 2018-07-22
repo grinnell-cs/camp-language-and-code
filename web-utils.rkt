@@ -148,20 +148,33 @@
 ; +-------------+
 
 ;;; Procedure:
-;;;   fetch-page
+;;;   fetch-page-pure
 ;;; Parameters:
-;;;   url, a string representing a URL
+;;;   url, a string that represents a URL
 ;;; Purpose:
 ;;;   Fetch the page at the given URL.
 ;;; Produces:
-;;;   page, an xexp
-;;; Problems:
-;;;   Not particularly robust.
-(define (fetch-page url)
+;;;   page, an xexp expression
+(define (fetch-page-pure url)
   (xexp/top-element (fetch-page-top url)))
 
 (define (fetch-page-top url)
   (html->xexp (get-pure-port (string->url url))))
+
+;;; Procedure:
+;;;   fetch-page
+;;; Parameters:
+;;;   url, a string representing a URL
+;;; Purpose:
+;;;   Fetch the page at the given URL, rewriting internal URLs so that
+;;;   it appears correctly.
+;;; Produces:
+;;;   page, an xexp expression
+;;; Problems:
+;;;   Not particularly robust.
+(define (fetch-page url)
+  (update-urls (fetch-page-pure url)
+               url))
 
 ;;; Procedure:
 ;;;   fetch-page-as-HTML
@@ -320,8 +333,8 @@
                             [else
                              (kernel (cdr pieces)
                                      (cons (car pieces) results))])))]
-                 [else
-                  (error "Invalid replacement" replacement)])])
+                     [else
+                      (error "Invalid replacement" replacement)])])
         ((sxml:modify (list "//text()" proc))
          page))))
 
@@ -337,3 +350,110 @@
                       'insert-into
                       element))
    page))
+
+;;; Procedure:
+;;;   update-attribute
+;;; Parameters:
+;;;   xexp, an xexp
+;;;   parameter, a symbol
+;;;   replacement, a procedure or string
+;;; Purpose:
+;;;   Update the given parameter of the xexp, either by applying
+;;;   replacement or by using replacement.
+;;; Produces:
+;;;   updated, an xexp
+(define (update-attribute xexp parameter replacement)
+  (let ([new-attributes
+         (let kernel ([attributes (cdr (extract-attributes xexp))])
+           (cond
+             [(null? attributes)
+              (if (string? replacement)
+                  (list (list parameter replacement))
+                  null)]
+             [(eq? parameter (caar attributes))
+              (let ([value (if (null? (cdar attributes))
+                               ""
+                               (cadar attributes))])
+                (cons (list parameter (if (procedure? replacement)
+                                          (replacement value)
+                                          replacement))
+                      (cdr attributes)))]
+             [else
+              (cons (car attributes)
+                    (kernel (cdr attributes)))]))])
+    (cons (car xexp)
+          (cons (cons '@ new-attributes)
+                (if (has-attributes? xexp)
+                    (cddr xexp)
+                    (cdr xexp))))))
+
+;;; Procedure:
+;;;   update-urls
+;;; Parameters:
+;;;   xexp, an xexp expression
+;;;   current-url, a string or URL
+;;; Purpose:
+;;;   Transform all the relative URLs to be absolute.
+;;; Produces:
+;;;   updated, an xexp expression
+(define (update-urls xexp current-url)
+  (let* ([url (if (string? current-url)
+                  (string->url current-url)
+                  current-url)]
+         [fix (lambda (relative)
+                (url->string (combine-url/relative url relative)))]
+         [fixer (lambda (attribute)
+                  (lambda (element context root)
+                    (update-attribute element attribute fix)))])
+    ((sxml:modify (list "//a" (fixer 'href))
+                  (list "//img" (fixer 'src))
+                  (list "//link" (fixer 'href))
+                  (list "//script" (fixer 'src)))
+     xexp)))
+
+; +-------------------------+----------------------------------------
+; | Miscellaneous utilities |
+; +-------------------------+
+
+;;; Procedure:
+;;;   has-attributes?
+;;; Parameters:
+;;;   xexp, an xexp expression
+;;; Purpose:
+;;;   Determine if xexp appears to have attributes
+;;; Produces:
+;;;   appears-to-have-attributes?, a Boolean
+(define (has-attributes? xexp)
+  (and (pair? xexp)
+       (not (null? (cdr xexp)))
+       (attributes? (cadr xexp))))
+
+;;; Procedure:
+;;;   attributes?
+;;; Parameters:
+;;;   val, a Scheme value
+;;; Purpose:
+;;;   Determines if val appears to represent a set of attributes.
+;;; Produces:
+;;;   appears-to-be-attributes?, a Boolean
+(define (attributes? val)
+  (and (pair? val)
+       (eq? '@ (car val))))
+
+;;; Procedure:
+;;;   extract-attributes
+;;; Parameters:
+;;;   xexp, an xexp expression
+;;; Purpose:
+;;;   Extract the attributes from the given xexp.
+;;; Produces:
+;;;   attributes, a list
+;;; Preconditions:
+;;;   [No additional]
+;;; Postconditions:
+;;;   * If (has-attributes? xexp), attributes is the attributes of xexp.
+;;;   * Otherwise, attributes is the empty list of attributes
+(define (extract-attributes xexp)
+  (if (has-attributes? xexp)
+      (cadr xexp)
+      '(@)))
