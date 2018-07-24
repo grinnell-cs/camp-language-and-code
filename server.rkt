@@ -230,7 +230,7 @@
                          "css"]
                         [else
                          "plain"])])
-           (display-line "Handling" path "with file" filename)
+           (display-line "Handling '" path "' with file '" filename "'")
            (response 200 #"OK"
                      (current-seconds)
                      (string->bytes/utf-8 (string-append "text/" type))
