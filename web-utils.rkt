@@ -215,7 +215,11 @@
 ;;;   Extract the text (string) from an xexp
 ;;; Produces:
 ;;;   text, a string
-(define extract-text (sxpath "string(/)"))
+(define (extract-text page)
+  ((sxpath "string(/)")
+   ((sxpath "//body")
+    (page-delete-comments
+     (page-delete-elements page 'script)))))  
 
 ;;; Procedure:
 ;;;   extract-by-tag
@@ -295,6 +299,21 @@
                                      (symbol->string tag))
                       'delete))
    page))
+
+;;; Procedure:
+;;;   page-delete-comments
+;;; Parameters:
+;;;   page, a page in the standard xexp format
+;;;   tag, a symbol
+;;; Purpose:
+;;;   Delete all the comments
+;;; Produces:
+;;;   newapage, a page in the standard xexp format
+;;; Ponderings:
+;;;   Comments seem to take the form `(*COMMENT* "The comment").  But I
+;;;   can't use *COMMENT* in an SXpath.  This serves as an alternative.
+(define page-delete-comments
+  (sxml:modify (list "//comment()" 'delete)))
 
 ;;; Procedure:
 ;;;   page-replace-text
