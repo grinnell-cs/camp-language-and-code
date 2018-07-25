@@ -217,9 +217,8 @@
 ;;;   text, a string
 (define (extract-text page)
   ((sxpath "string(/)")
-   ((sxpath "//body")
-    (page-delete-comments
-     (page-delete-elements page 'script)))))  
+   (page-delete-comments
+     (page-delete-elements page 'script))))
 
 ;;; Procedure:
 ;;;   extract-by-tag
