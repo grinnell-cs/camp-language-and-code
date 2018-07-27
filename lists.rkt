@@ -91,7 +91,7 @@
          (kernel (+ 1 count)
                  (cdr remaining))]
         [else
-         (kernel 0
+         (kernel count
                  (cdr remaining))]))))
 
 ;;; Procedure:
