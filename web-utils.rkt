@@ -179,7 +179,7 @@
 ;;; Problems:
 ;;;   Not particularly robust.
 (define (fetch-page url)
-  (update-urls (fetch-page-pure url)
+  (update-urls (merge-multiple-classes (fetch-page-pure url))
                url))
 
 ;;; Procedure:
@@ -481,3 +481,88 @@
   (if (has-attributes? xexp)
       (cadr xexp)
       '(@)))
+
+;;; Procedure:
+;;;   extract-contents
+;;; Parameters:
+;;;   xexp, an xexp expressions
+;;; Purpose:
+;;;   Extract the contents of an xexp (everything but the tag and attributes)
+;;; Produces:
+;;;   contents, a list of xexp expressions
+(define (extract-contents xexp)
+  (if (pair? xexp)
+    (if (has-attributes? xexp)
+        (cddr xexp)
+        (cdr xexp))
+    xexp))
+    
+;;; Procedure:
+;;;   double-class
+;;; Parameters:
+;;;   xexp, an xexp expression
+;;; Purpose:
+;;;   Find and print all the elements in xexp that have two class tags
+;;; Produces:
+;;;   [Nothing; called for the side effect]
+(define (double-class xexp)
+  (when (pair? xexp)
+    (when (< 1 (tally (lambda (att) (eq? 'class (car att))) (cdr (extract-attributes xexp))))
+      (write xexp)
+      (newline)
+      (newline))
+    (for-each double-class (extract-contents xexp))))
+
+;;; Procedure:
+;;;   merge-class-attributes
+;;; Parameters:
+;;;   attributes, a standard attribute list
+;;; Purpose:
+;;;   Merge all the class attributes in the list
+;;; Produces:
+;;;   new-attributes, a standard attribute list
+;;; Preconditions:
+;;;   attributes has the form (@ (att1 val1) (att2 val2) ...)
+;;; Postconditions:
+;;;   * new-attributes has the form (@ (att1 val1) (att2 val2) ...)
+;;;   * If (att val) is in attributes and att is not class, (att val)
+;;;     is in new-attributes.
+;;;   * If ('class val) is in attributes then there is a class attribute
+;;;     in new-attributes and val is in it.
+(define merge-class-attributes
+  (lambda (attributes)
+    (let ([class-attributes
+           (filter (lambda (att) (eq? (car att) 'class)) (cdr attributes))]
+          [other-attributes
+           (filter (lambda (att) (not (eq? (car att) 'class))) (cdr attributes))])
+      (if (or (null? class-attributes)
+              (null? (cdr class-attributes)))
+          attributes
+          (cons '@
+                (cons (list 'class
+                            (reduce (lambda (a b) (string-append a " " b))
+                                    (map cadr class-attributes)))
+                      other-attributes))))))
+
+;;; Procedure:
+;;;   fix-multiple-classes
+;;; Parameters:
+;;;   xexp, an xexp expression
+;;; Purpose:
+;;;   Fix the elements in xexp that have more than one class attribute.
+;;; Produces:
+;;;   fixed-xexp, an xexp expression
+;;; Pondering:
+;;;   Officially, an xexp expression should not have two class attributes.
+;;;   Unfortunately, many Web pages do have multiple class attributes.
+;;;   This procedure attempts to address that deficiency.
+(define merge-multiple-classes
+  (lambda (xexp)
+    (if (not (pair? xexp))
+        xexp
+        (if (has-attributes? xexp)
+            (cons (car xexp)
+                  (cons (merge-class-attributes (cadr xexp))
+                        (map merge-multiple-classes (cddr xexp))))
+            (cons (car xexp)
+                  (map merge-multiple-classes (cdr xexp)))))))
