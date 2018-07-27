@@ -66,6 +66,9 @@
     ; Attributes
     [(eq? (car xexp) '@)
      (cons '@ (xexp/attributes-fix (cdr xexp)))]
+    ; Entitys
+    [(eq? (car xexp) '&)
+     xexp]
     ; Everything else
     [else
      (cons (car xexp)
