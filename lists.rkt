@@ -12,7 +12,7 @@
    [all (-> procedure? list? boolean?)]
    [index-of (-> any/c list? integer?)]
    [reduce (-> (-> any/c any/c any) list? any/c)]
-   [tally (-> procedure? list? boolean?)]
+   [tally (-> procedure? list? integer?)]
    [tally-all (-> list? list?)]
    [sort-by-count-decreasing (-> list? list?)]
    [sort-by-count-increasing (-> list? list?)]
