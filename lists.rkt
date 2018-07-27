@@ -12,6 +12,7 @@
    [all (-> procedure? list? boolean?)]
    [index-of (-> any/c list? integer?)]
    [reduce (-> (-> any/c any/c any) list? any/c)]
+   [tally (-> procedure? list? boolean?)]
    [tally-all (-> list? list?)]
    [sort-by-count-decreasing (-> list? list?)]
    [sort-by-count-increasing (-> list? list?)]
@@ -65,6 +66,33 @@
          pos]
         [else
          (kernel (+ pos 1) (cdr remaining))]))))
+
+;;; Procedure:
+;;;   tally
+;;; Parameters:
+;;;   pred?, a unary predicate
+;;;   lst, a list of values
+;;; Purpose:
+;;;   Count how many values in the list match the predicate
+;;; Produces:
+;;;   count, a non-negative integer
+;;; Preconditions:
+;;;   pred? can be applied to every element of lst.
+;;; Postconditions:
+;;;   There are exactly `count` elements in `lst` for which `pred?` holds.
+(define tally
+  (lambda (pred? lst)
+    (let kernel ([count 0]
+                 [remaining lst])
+      (cond
+        [(null? remaining)
+         count]
+        [(pred? (car remaining))
+         (kernel (+ 1 count)
+                 (cdr remaining))]
+        [else
+         (kernel 0
+                 (cdr remaining))]))))
 
 ;;; Procedure:
 ;;;   tally-all
